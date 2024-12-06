@@ -3,7 +3,7 @@ install all the dependencies that you need for the backend
 navigate to the backend and run with: 
 python -m uvicorn data:app
 
-navigate to the frontend and run with:
+navigate to the frontend realestate folder and run with:
 npm start
 
 make sure that local database is up and running is is named "realestate" with user "postgres" -- or change this url in the backend to whatever your database is: DATABASE_URL = "postgresql://postgres:password@localhost:5432/realestate"
