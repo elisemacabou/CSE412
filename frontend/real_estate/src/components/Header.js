@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-function Header({ isLoggedIn, handleLogout, onSearch }) {
+function Header({ isLoggedIn, handleLogout, onSearch, addCity}) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Trigger search on button click
   const handleSearchClick = () => {
     if (onSearch) {
       onSearch(searchQuery); // Call the search function passed from App.js
+      if (addCity && searchQuery.trim() !== '') {
+        addCity(searchQuery.trim()); // Add the city dynamically
+      }
     }
   };
 
