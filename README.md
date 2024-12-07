@@ -78,3 +78,13 @@ SELECT p.* FROM properties p INNER JOIN favorites f ON p.id = f.property_id WHER
 Delete a Favorite:
 DELETE FROM favorites WHERE user_id = 1 AND property_id = 1; -- Remove property from favorites
 
+CREATE TABLE agents (
+    agent_id SERIAL PRIMARY KEY,       -- Unique identifier for the agent
+    name VARCHAR(100) NOT NULL,        -- Agent's name
+    email VARCHAR(150) NOT NULL,       -- Agent's email
+    rating DECIMAL(3, 2) NOT NULL,     -- Agent's rating, e.g., 4.75
+    property_id INT NOT NULL,          -- Foreign key referencing properties table
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
+);
+
+
