@@ -12,10 +12,18 @@ function App() {
   const [user, setUser] = useState(null); // Store user info after login
   const [properties, setProperties] = useState([]); // State for properties
   const [showFavorites, setShowFavorites] = useState(false); // State for toggling favorites view
-
+  const [cities, setCities] = useState([]);
   // Handle sorting change
   const handleSortChange = (option) => {
     setSortOption(option);
+  };
+
+  const addCity = (city) => {
+    if (!cities.includes(city)) {
+      setCities([...cities, city]); // Add city to the list if it doesn't already exist
+      console.log('City added:', city); // Debug log
+      console.log('Updated cities list:', [...cities, city]); // Debug log
+    }
   };
 
   // Handle logout
@@ -37,8 +45,8 @@ function App() {
       const response = await fetch(`http://localhost:8000/search?location=${city}`);
       if (response.ok) {
         const data = await response.json();
-        setProperties(data.properties); // Update properties with search results
-        setShowFavorites(false); // Ensure we are not showing favorites
+        setProperties(data.properties);
+        addCity(city); // Add city to the list dynamically
       } else {
         console.error('Error fetching properties:', response.statusText);
       }
@@ -131,6 +139,7 @@ function App() {
                   onFilterChange={handleFilterChange} // Pass filter handler
                   onFavoritesChange={fetchFavorites} // Pass favorites handler
                   showFavorites={showFavorites} // State for toggling
+                  cities={cities}
                 />
                 <PropertyGrid
                   properties={sortedProperties} // Pass sorted properties
