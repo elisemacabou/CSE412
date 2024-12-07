@@ -24,7 +24,7 @@ cur = conn.cursor()
 
 # RapidAPI headers for Zillow API
 RAPIDAPI_HOST = "zillow-com1.p.rapidapi.com"
-RAPIDAPI_KEY = "fc2e5f9193msh4f8d3fbec00ad65p11c0acjsn89248ccf943c"
+RAPIDAPI_KEY = "hidden"
 
 headers = {
     "x-rapidapi-host": RAPIDAPI_HOST,
@@ -182,23 +182,31 @@ def filter_properties(filters: dict):
         # Build the base query
         query = """
             SELECT id, zillow_id, price, bedrooms, bathrooms, days_on_zillow, address, img_src, 
-                   property_type, living_area, lot_area_value, lot_area_unit, listing_status, currency, country
+                   property_type, living_area, lot_area_value, lot_area_unit, listing_status, currency, country, city
             FROM properties
-            WHERE price <= %s
-            AND living_area <= %s
+            WHERE price BETWEEN %s AND %s
+            AND living_area BETWEEN %s AND %s
         """
-        params = [filters["price"], filters["squareFeet"]]
+        params = [
+            filters.get("priceMin", 0),  # Default min price
+            filters.get("priceMax", 10000000),  # Default max price
+            filters.get("squareFeetMin", 0),  # Default min square feet
+            filters.get("squareFeetMax", 50000),  # Default max square feet
+        ]
 
-        # Add additional conditions based on optional filters
+        # Add optional filters for bedrooms and city
         if filters.get("bedrooms"):
             query += " AND bedrooms = %s"
             params.append(filters["bedrooms"])
+
+        if filters.get("city"):
+            query += " AND city = %s"
+            params.append(filters["city"])
 
         # Execute the query with parameters
         cur.execute(query, params)
         properties = cur.fetchall()
 
-        # Check if any properties are fetched
         if not properties:
             return {"properties": [], "message": "No properties found matching the filters."}
 
@@ -212,7 +220,7 @@ def filter_properties(filters: dict):
                 "bathrooms": row[4],
                 "days_on_zillow": row[5],
                 "address": row[6],
-                "img_src": row[7] if row[7] else "https://via.placeholder.com/400",  # Default placeholder if no image
+                "img_src": row[7] or "https://via.placeholder.com/400",
                 "property_type": row[8],
                 "living_area": row[9],
                 "lot_area_value": row[10],
@@ -220,19 +228,16 @@ def filter_properties(filters: dict):
                 "listing_status": row[12],
                 "currency": row[13],
                 "country": row[14],
+                "city": row[15],
             }
             for row in properties
         ]
 
-        # Return the structured property list
         return {"properties": property_list}
 
     except Exception as e:
-        # Log and return an error message in case of exceptions
         print(f"Error filtering properties: {e}")
         raise HTTPException(status_code=500, detail=f"Error filtering properties: {str(e)}")
-
-
 @app.get("/search")
 def search_properties(location: str, status_type: str = "ForSale"):
     url = f"https://{RAPIDAPI_HOST}/propertyExtendedSearch"
@@ -246,9 +251,11 @@ def search_properties(location: str, status_type: str = "ForSale"):
     response = requests.get(url, headers=headers, params=params)
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch properties from Zillow API")
+    
     properties = response.json().get("props", [])
-
     saved_properties = []
+
+    # Insert properties into the database, including the city
     for prop in properties:
         property_data = {
             "zillow_id": prop["zpid"],
@@ -265,13 +272,14 @@ def search_properties(location: str, status_type: str = "ForSale"):
             "listing_status": prop["listingStatus"],
             "currency": prop.get("currency", "USD"),
             "country": prop.get("country", "USA"),
+            "city": location,  # Add the city from the search
         }
         try:
             cur.execute(
                 """
                 INSERT INTO properties (zillow_id, price, bedrooms, bathrooms, days_on_zillow, address, img_src, 
-                property_type, living_area, lot_area_value, lot_area_unit, listing_status, currency, country)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                property_type, living_area, lot_area_value, lot_area_unit, listing_status, currency, country, city)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (zillow_id) DO NOTHING
                 """,
                 (
@@ -289,6 +297,7 @@ def search_properties(location: str, status_type: str = "ForSale"):
                     property_data["listing_status"],
                     property_data["currency"],
                     property_data["country"],
+                    property_data["city"],  # Include city in the database
                 ),
             )
             conn.commit()
@@ -296,6 +305,13 @@ def search_properties(location: str, status_type: str = "ForSale"):
         except Exception as e:
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    return {
+        "properties": saved_properties,
+        "city": location,
+    }
+
+ # START THE BACKEND: python -m uvicorn data:app
     
     return {"properties": saved_properties}
 
